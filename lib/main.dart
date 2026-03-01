@@ -15,6 +15,8 @@ Future<void> main() async {
   runApp(const MyApp());
 }
 
+final supabase = Supabase.instance.client;
+
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
@@ -26,11 +28,292 @@ class MyApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.green),
         useMaterial3: true,
       ),
-      home: const MapaPage(),
+      // Si hay sesión activa va al mapa, si no al login
+      home: supabase.auth.currentSession != null
+          ? const MapaPage()
+          : const LoginPage(),
     );
   }
 }
 
+// ═══════════════════════════════════════════
+// PANTALLA DE LOGIN
+// ═══════════════════════════════════════════
+class LoginPage extends StatefulWidget {
+  const LoginPage({super.key});
+
+  @override
+  State<LoginPage> createState() => _LoginPageState();
+}
+
+class _LoginPageState extends State<LoginPage> {
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
+  bool _cargando = false;
+  bool _mostrarPassword = false;
+
+  Future<void> _login() async {
+    setState(() => _cargando = true);
+    try {
+      await supabase.auth.signInWithPassword(
+        email: _emailController.text.trim(),
+        password: _passwordController.text.trim(),
+      );
+      if (mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const MapaPage()),
+        );
+      }
+    } on AuthException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: ${e.message}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      setState(() => _cargando = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.white,
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              // Logo
+              Container(
+                width: 80,
+                height: 80,
+                decoration: BoxDecoration(
+                  color: Colors.green,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: const Icon(
+                  Icons.location_city,
+                  color: Colors.white,
+                  size: 50,
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Puerto Montt App',
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.green,
+                ),
+              ),
+              const Text(
+                'Monitoreo Urbano Inteligente',
+                style: TextStyle(color: Colors.grey),
+              ),
+              const SizedBox(height: 40),
+              // Email
+              TextField(
+                controller: _emailController,
+                keyboardType: TextInputType.emailAddress,
+                decoration: InputDecoration(
+                  labelText: 'Correo electrónico',
+                  prefixIcon: const Icon(Icons.email),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              // Password
+              TextField(
+                controller: _passwordController,
+                obscureText: !_mostrarPassword,
+                decoration: InputDecoration(
+                  labelText: 'Contraseña',
+                  prefixIcon: const Icon(Icons.lock),
+                  suffixIcon: IconButton(
+                    icon: Icon(_mostrarPassword
+                        ? Icons.visibility_off
+                        : Icons.visibility),
+                    onPressed: () {
+                      setState(() => _mostrarPassword = !_mostrarPassword);
+                    },
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 24),
+              // Botón Login
+              SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.green,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  onPressed: _cargando ? null : _login,
+                  child: _cargando
+                      ? const CircularProgressIndicator(color: Colors.white)
+                      : const Text(
+                          'Iniciar Sesión',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              // Ir a Registro
+              TextButton(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const RegisterPage()),
+                  );
+                },
+                child: const Text(
+                  '¿No tienes cuenta? Regístrate',
+                  style: TextStyle(color: Colors.green),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════
+// PANTALLA DE REGISTRO
+// ═══════════════════════════════════════════
+class RegisterPage extends StatefulWidget {
+  const RegisterPage({super.key});
+
+  @override
+  State<RegisterPage> createState() => _RegisterPageState();
+}
+
+class _RegisterPageState extends State<RegisterPage> {
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
+  bool _cargando = false;
+
+  Future<void> _registrar() async {
+    setState(() => _cargando = true);
+    try {
+      await supabase.auth.signUp(
+        email: _emailController.text.trim(),
+        password: _passwordController.text.trim(),
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('✓ Cuenta creada! Revisa tu email para confirmar.'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        Navigator.pop(context);
+      }
+    } on AuthException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: ${e.message}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      setState(() => _cargando = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Crear Cuenta'),
+        backgroundColor: Colors.green,
+        foregroundColor: Colors.white,
+      ),
+      body: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.person_add, size: 60, color: Colors.green),
+            const SizedBox(height: 24),
+            TextField(
+              controller: _emailController,
+              keyboardType: TextInputType.emailAddress,
+              decoration: InputDecoration(
+                labelText: 'Correo electrónico',
+                prefixIcon: const Icon(Icons.email),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _passwordController,
+              obscureText: true,
+              decoration: InputDecoration(
+                labelText: 'Contraseña (mínimo 6 caracteres)',
+                prefixIcon: const Icon(Icons.lock),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              height: 50,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.green,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                onPressed: _cargando ? null : _registrar,
+                child: _cargando
+                    ? const CircularProgressIndicator(color: Colors.white)
+                    : const Text(
+                        'Crear Cuenta',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════
+// PANTALLA DEL MAPA
+// ═══════════════════════════════════════════
 class MapaPage extends StatefulWidget {
   const MapaPage({super.key});
 
@@ -42,11 +325,7 @@ class _MapaPageState extends State<MapaPage> {
   LatLng _ubicacion = const LatLng(-41.4717, -72.9353);
   bool _cargando = true;
   final MapController _mapController = MapController();
-  final supabase = Supabase.instance.client;
-
   List<Map<String, dynamic>> _incidentes = [];
-
-  // Canal de Realtime
   RealtimeChannel? _canal;
 
   @override
@@ -59,12 +338,10 @@ class _MapaPageState extends State<MapaPage> {
 
   @override
   void dispose() {
-    // Cancelar suscripción al salir
     _canal?.unsubscribe();
     super.dispose();
   }
 
-  // Suscribirse a cambios en tiempo real
   void _suscribirRealtime() {
     _canal = supabase
         .channel('incidentes_realtime')
@@ -73,11 +350,7 @@ class _MapaPageState extends State<MapaPage> {
           schema: 'public',
           table: 'incidentes',
           callback: (payload) {
-            // Cuando alguien inserta un nuevo incidente, recargar
-            debugPrint('Nuevo incidente recibido en tiempo real!');
             _cargarIncidentes();
-
-            // Mostrar notificación
             if (mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
@@ -113,29 +386,34 @@ class _MapaPageState extends State<MapaPage> {
         setState(() => _cargando = false);
         return;
       }
-
       LocationPermission permiso = await Geolocator.checkPermission();
       if (permiso == LocationPermission.denied) {
         permiso = await Geolocator.requestPermission();
       }
-
       if (permiso == LocationPermission.deniedForever) {
         setState(() => _cargando = false);
         return;
       }
-
       Position posicion = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high,
       );
-
       setState(() {
         _ubicacion = LatLng(posicion.latitude, posicion.longitude);
         _cargando = false;
       });
-
       _mapController.move(_ubicacion, 15);
     } catch (e) {
       setState(() => _cargando = false);
+    }
+  }
+
+  Future<void> _cerrarSesion() async {
+    await supabase.auth.signOut();
+    if (mounted) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const LoginPage()),
+      );
     }
   }
 
@@ -209,7 +487,8 @@ class _MapaPageState extends State<MapaPage> {
                   descripcionController.text,
                 );
               },
-              child: const Text('Reportar', style: TextStyle(color: Colors.white)),
+              child: const Text('Reportar',
+                  style: TextStyle(color: Colors.white)),
             ),
           ],
         ),
@@ -217,7 +496,8 @@ class _MapaPageState extends State<MapaPage> {
     );
   }
 
-  Widget _botonTipo(String valor, String etiqueta, String seleccionado, Function(String) onTap) {
+  Widget _botonTipo(String valor, String etiqueta, String seleccionado,
+      Function(String) onTap) {
     final bool activo = valor == seleccionado;
     return GestureDetector(
       onTap: () => onTap(valor),
@@ -251,12 +531,12 @@ class _MapaPageState extends State<MapaPage> {
         'tipo': tipo,
         'gravedad': gravedad,
         'descripcion': descripcion.isEmpty ? null : descripcion,
+        'usuario_id': supabase.auth.currentUser?.id,
       });
-
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('✓ Reporte de $tipo guardado exitosamente'),
+            content: Text('✓ Reporte de $tipo guardado'),
             backgroundColor: Colors.green,
           ),
         );
@@ -265,7 +545,7 @@ class _MapaPageState extends State<MapaPage> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error al guardar: $e'),
+            content: Text('Error: $e'),
             backgroundColor: Colors.red,
           ),
         );
@@ -297,6 +577,8 @@ class _MapaPageState extends State<MapaPage> {
 
   @override
   Widget build(BuildContext context) {
+    final usuario = supabase.auth.currentUser;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Puerto Montt App'),
@@ -313,18 +595,32 @@ class _MapaPageState extends State<MapaPage> {
               backgroundColor: Colors.white,
             ),
           ),
-          if (_cargando)
-            const Padding(
-              padding: EdgeInsets.all(16),
-              child: SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(
-                  color: Colors.white,
-                  strokeWidth: 2,
+          // Menu usuario
+          PopupMenuButton(
+            icon: const Icon(Icons.account_circle),
+            itemBuilder: (_) => [
+              PopupMenuItem(
+                enabled: false,
+                child: Text(
+                  usuario?.email ?? 'Invitado',
+                  style: const TextStyle(fontSize: 12, color: Colors.grey),
                 ),
               ),
-            ),
+              const PopupMenuItem(
+                value: 'logout',
+                child: Row(
+                  children: [
+                    Icon(Icons.logout, color: Colors.red),
+                    SizedBox(width: 8),
+                    Text('Cerrar sesión'),
+                  ],
+                ),
+              ),
+            ],
+            onSelected: (value) {
+              if (value == 'logout') _cerrarSesion();
+            },
+          ),
         ],
       ),
       body: FlutterMap(
@@ -357,7 +653,6 @@ class _MapaPageState extends State<MapaPage> {
                 final ubicacion = incidente['ubicacion'] as String? ?? '';
                 double lat = _ubicacion.latitude;
                 double lng = _ubicacion.longitude;
-
                 try {
                   final coords = ubicacion
                       .replaceAll('POINT(', '')
@@ -368,7 +663,6 @@ class _MapaPageState extends State<MapaPage> {
                 } catch (e) {
                   debugPrint('Error parseando coordenadas: $e');
                 }
-
                 return Marker(
                   point: LatLng(lat, lng),
                   width: 50,
@@ -403,9 +697,7 @@ class _MapaPageState extends State<MapaPage> {
           FloatingActionButton(
             heroTag: 'ubicacion',
             backgroundColor: Colors.green,
-            onPressed: () {
-              _mapController.move(_ubicacion, 15);
-            },
+            onPressed: () => _mapController.move(_ubicacion, 15),
             child: const Icon(Icons.my_location, color: Colors.white),
           ),
         ],
